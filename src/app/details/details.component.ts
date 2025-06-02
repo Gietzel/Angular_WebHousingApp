@@ -1,11 +1,11 @@
-// details.component.ts
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { HousingService } from '../housing.service';
 import { HousingLocation } from '../housinglocation';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-details',
@@ -13,7 +13,8 @@ import { MatIconModule } from '@angular/material/icon';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatIconModule
+    MatIconModule,
+    FormsModule,
   ],
   template: `
     <article class="details-article">
@@ -68,20 +69,38 @@ import { MatIconModule } from '@angular/material/icon';
           </div>
         </section>
 
-        <section class="listing-apply">
-          <h2 class="section-heading">Apply now to live here</h2>
-          <form [formGroup]="applyForm" (ngSubmit)="submitApplication()">
-            <label for="first-name">First Name</label>
-            <input id="first-name" type="text" formControlName="firstName" required />
+        <section class="listing-reservation">
+          <button class="primary large" (click)="makeReservation()">
+            Fazer Reserva
+          </button>
 
-            <label for="last-name">Last Name</label>
-            <input id="last-name" type="text" formControlName="lastName" required />
+          <div class="or-divider">ou</div>
 
-            <label for="email">Email</label>
-            <input id="email" type="email" formControlName="email" required />
+          <div class="proposal-section">
+            <label for="propose-value" class="proposal-label">ENVIAR UMA PROPOSTA</label>
+            <div class="input-with-tooltip">
+                <input
+                  id="propose-value"
+                  type="text"
+                  [value]="formattedProposal"
+                  (input)="onProposalInput($event)"
+                  placeholder="Digite sua proposta"
+                  required
+                />
+              <div *ngIf="showTooltip" class="tooltip">
+                Valor muito baixo! Deve ser pelo menos 70% do valor original.
+              </div>
+            </div>
 
-            <button type="submit" class="primary">Apply now</button>
-          </form>
+            <button
+              class="secondary"
+              [disabled]="showTooltip || !proposalValue"
+              (click)="submitProposal()"
+            >
+              Enviar Proposta
+            </button>
+          </div>
+
         </section>
       </div>
 
@@ -93,13 +112,22 @@ import { MatIconModule } from '@angular/material/icon';
         />
       </div>
     </article>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   `,
   styleUrls: ['./details.component.css'],
 })
+
 export class DetailsComponent implements OnInit {
   route: ActivatedRoute = inject(ActivatedRoute);
   housingService = inject(HousingService);
   housingLocation?: HousingLocation;
+  formattedProposal = '';
+  totalPrice = 0;
+  proposalValue: number | null = null;
+  showTooltip = false;
+  rawProposalDigits: string = '';
+  stayValue: number = 1;
 
   applyForm = new FormGroup({
     firstName: new FormControl(''),
@@ -108,21 +136,23 @@ export class DetailsComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    window.scrollTo(0, 0);
+
     const id = parseInt(this.route.snapshot.params['id'], 10);
     this.housingLocation = this.housingService.getHousingLocationById(id);
+
+    const stay = this.route.snapshot.queryParamMap.get('stay');
+    this.stayValue = stay ? Math.max(1, parseInt(stay, 10)) : 1;
   }
 
-  // Submit application (no change)
   submitApplication() {
     if (this.applyForm.valid) {
       const { firstName, lastName, email } = this.applyForm.value;
       this.housingService.submitApplication(firstName!, lastName!, email!);
-      // Optionally reset form or show a success message
       this.applyForm.reset();
     }
   }
 
-  // Map amenity names to Material icon names
   getIconName(amenity: string): string {
     switch (amenity.toLowerCase()) {
       case 'piscina':          return 'pool';
@@ -138,35 +168,107 @@ export class DetailsComponent implements OnInit {
       case 'varanda':          return 'deck';
       case 'portaria 24h':     return 'security';
       case 'coworking':        return 'business_center';
-      default:                 return 'check_circle';  // fallback icon
+      default:                 return 'check_circle'; 
     }
   }
 
-  // Calculate number of days between availableFrom and availableTo
   getNumDays(): number {
-    if (!this.housingLocation?.availableFrom || !this.housingLocation?.availableTo) {
-      return 0;
-    }
-    const start = new Date(this.housingLocation.availableFrom);
-    const end = new Date(this.housingLocation.availableTo);
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const diffMs = Math.abs(end.getTime() - start.getTime());
-    return Math.max(1, Math.floor(diffMs / msPerDay)); // at least 1 day
+    return this.stayValue;
   }
 
-  // Base cost without platform fee
   getBaseCost(): number {
     if (!this.housingLocation) return 0;
     return this.getNumDays() * this.housingLocation.price;
   }
 
-  // Platform fee (10% of base cost)
   getPlatformFee(): number {
     return this.getBaseCost() * 0.10;
   }
 
-  // Total cost including platform fee
   getTotalCost(): number {
-    return this.getBaseCost() + this.getPlatformFee();
+    this.totalPrice = this.getBaseCost() + this.getPlatformFee();
+
+    return this.totalPrice;
+  }
+
+  makeReservation() {
+    Swal.fire({
+      title: 'Reserva realizada com sucesso!',
+      position: 'bottom-end',
+      background: '#f3e8ff',
+      showConfirmButton: false,
+      timer: 3000,
+      customClass: {
+        popup: 'custom-swal-popup'
+      }
+    });
+  }
+
+  makeProposal() {
+    Swal.fire({
+      title: `Proposta de R$${this.proposalValue} enviada ao proprietário!`,
+      position: 'bottom-end',
+      background: '#f3e8ff',
+      showConfirmButton: false,
+      timer: 3000,
+      customClass: {
+        popup: 'custom-swal-popup'
+      }
+    });
+  }
+
+  onProposalInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const inputEvent = event as InputEvent;
+
+    if (inputEvent.inputType === 'deleteContentBackward') {
+      this.rawProposalDigits = this.rawProposalDigits.slice(0, -1);
+    } else if (inputEvent.data && /\d/.test(inputEvent.data)) {
+      this.rawProposalDigits += inputEvent.data;
+    } else {
+      input.value = this.formattedProposal;
+      return;
+    }
+
+    const padded = this.rawProposalDigits.padStart(3, '0');
+    const floatString = padded.slice(0, -2) + '.' + padded.slice(-2);
+    const numeric = parseFloat(floatString) || 0;
+
+    this.proposalValue = numeric;
+    this.formattedProposal = this.maskCurrencyString(numeric);
+    input.value = this.formattedProposal;
+    this.validateProposal();
+  }
+
+  onProposalBlur(): void {
+    this.validateProposal();
+  }
+
+  maskCurrencyString(value: number): string {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  }
+
+  validateProposal(): void {
+    if (this.proposalValue !== null) {
+      const minimumAllowed = this.totalPrice * 0.7;
+      this.showTooltip = this.proposalValue < minimumAllowed;
+    } else {
+      this.showTooltip = false;
+    }
+  }
+
+  submitProposal(): void {
+    if (this.showTooltip || this.proposalValue === null) {
+      return;
+    }
+
+    this.makeProposal()
+
+    this.rawProposalDigits = '';
+    this.proposalValue = null;
+    this.formattedProposal = '';
   }
 }

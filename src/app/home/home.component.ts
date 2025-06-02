@@ -76,7 +76,8 @@ import { MatIconModule } from '@angular/material/icon';
       <section class="results" [class.blur]="isLoading">
         <app-housing-location
           *ngFor="let housingLocation of filteredLocationList"
-          [housingLocation]="housingLocation">
+          [housingLocation]="housingLocation"
+          [stayValue]="stayValue">
         </app-housing-location>
       </section>
     </section>
@@ -89,7 +90,7 @@ export class HomeComponent implements OnInit {
   filteredLocationList: HousingLocation[] = [];
   cityList: string[] = [];
   textFilter: string = '';
-
+  stayValue: number = 1; 
   housingService: HousingService = inject(HousingService);
 
   dateRange = new FormGroup({
@@ -106,8 +107,11 @@ export class HomeComponent implements OnInit {
     this.dateRange.valueChanges.subscribe(range => {
       const start = range.start;
       const end = range.end;
+      const msPerDay = 1000 * 60 * 60 * 24;
 
       if (start && end) {
+        const diffMs = Math.abs(end.getTime() - start.getTime());
+        this.stayValue = Math.max(1, Math.floor(diffMs / msPerDay));
         this.filterResults(start, end);
       }
     });

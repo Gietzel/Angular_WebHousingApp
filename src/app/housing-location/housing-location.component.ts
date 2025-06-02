@@ -15,7 +15,10 @@ import { RouterModule } from '@angular/router';
       <img class="listing-photo" [src]="housingLocation.photo" alt="Foto principal de {{housingLocation.name}}">
       <h2 class="listing-heading">{{ housingLocation.name }}</h2>
       <p class="listing-location">{{ housingLocation.city}}, {{housingLocation.state }}</p>
-      <a [routerLink]="['/details', housingLocation.id]">Ver Detalhes</a>
+      <a [routerLink]="['/details', housingLocation.id]"
+        [queryParams]="{ stay: stayValue }">
+        Ver Detalhes
+      </a>
     </section>
   `,
   styleUrls: ['./housing-location.component.css'],
@@ -24,5 +27,6 @@ import { RouterModule } from '@angular/router';
 export class HousingLocationComponent {
 
   @Input() housingLocation!: HousingLocation;
+  @Input() stayValue: number = 1;
 
 }
